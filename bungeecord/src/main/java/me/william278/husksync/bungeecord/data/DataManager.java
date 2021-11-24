@@ -3,6 +3,7 @@ package me.william278.husksync.bungeecord.data;
 import me.william278.husksync.PlayerData;
 import me.william278.husksync.HuskSyncBungeeCord;
 import me.william278.husksync.Settings;
+import me.william278.husksync.SynchronisationCluster;
 import me.william278.husksync.bungeecord.data.sql.Database;
 
 import java.sql.*;
@@ -17,7 +18,7 @@ public class DataManager {
     /**
      * The player data cache for each cluster ID
      */
-    public static HashMap<Settings.SynchronisationCluster, PlayerDataCache> playerDataCache = new HashMap<>();
+    public static HashMap<SynchronisationCluster, PlayerDataCache> playerDataCache = new HashMap<>();
 
     /**
      * Checks if the player is registered on the database.
@@ -27,7 +28,7 @@ public class DataManager {
      * @param playerUUID The UUID of the player to register
      */
     public static void ensurePlayerExists(UUID playerUUID, String playerName) {
-        for (Settings.SynchronisationCluster cluster : Settings.clusters) {
+        for (SynchronisationCluster cluster : Settings.clusters) {
             if (!playerExists(playerUUID, cluster)) {
                 createPlayerEntry(playerUUID, playerName, cluster);
             } else {
@@ -42,7 +43,7 @@ public class DataManager {
      * @param playerUUID The UUID of the player
      * @return {@code true} if the player is on the player table
      */
-    private static boolean playerExists(UUID playerUUID, Settings.SynchronisationCluster cluster) {
+    private static boolean playerExists(UUID playerUUID, SynchronisationCluster cluster) {
         try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
             try (PreparedStatement statement = connection.prepareStatement(
                     "SELECT * FROM " + cluster.playerTableName() + " WHERE `uuid`=?;")) {
@@ -56,7 +57,7 @@ public class DataManager {
         }
     }
 
-    private static void createPlayerEntry(UUID playerUUID, String playerName, Settings.SynchronisationCluster cluster) {
+    private static void createPlayerEntry(UUID playerUUID, String playerName, SynchronisationCluster cluster) {
         try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
             try (PreparedStatement statement = connection.prepareStatement(
                     "INSERT INTO " + cluster.playerTableName() + " (`uuid`,`username`) VALUES(?,?);")) {
@@ -69,7 +70,7 @@ public class DataManager {
         }
     }
 
-    public static void updatePlayerName(UUID playerUUID, String playerName, Settings.SynchronisationCluster cluster) {
+    public static void updatePlayerName(UUID playerUUID, String playerName, SynchronisationCluster cluster) {
         try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
             try (PreparedStatement statement = connection.prepareStatement(
                     "UPDATE " + cluster.playerTableName() + " SET `username`=? WHERE `uuid`=?;")) {
@@ -90,7 +91,7 @@ public class DataManager {
      */
     public static PlayerData getPlayerDataByName(String playerName, String clusterId) {
         PlayerData playerData = null;
-        for (Settings.SynchronisationCluster cluster : Settings.clusters) {
+        for (SynchronisationCluster cluster : Settings.clusters) {
             if (cluster.clusterId().equals(clusterId)) {
                 try (Connection connection = HuskSyncBungeeCord.getConnection(clusterId)) {
                     try (PreparedStatement statement = connection.prepareStatement(
@@ -119,9 +120,9 @@ public class DataManager {
         return playerData;
     }
 
-    public static Map<Settings.SynchronisationCluster, PlayerData> getPlayerData(UUID playerUUID) {
-        HashMap<Settings.SynchronisationCluster, PlayerData> data = new HashMap<>();
-        for (Settings.SynchronisationCluster cluster : Settings.clusters) {
+    public static Map<SynchronisationCluster, PlayerData> getPlayerData(UUID playerUUID) {
+        HashMap<SynchronisationCluster, PlayerData> data = new HashMap<>();
+        for (SynchronisationCluster cluster : Settings.clusters) {
             try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
                 try (PreparedStatement statement = connection.prepareStatement(
                         "SELECT * FROM " + cluster.dataTableName() + " WHERE `player_id`=(SELECT `id` FROM " + cluster.playerTableName() + " WHERE `uuid`=?);")) {
@@ -165,7 +166,7 @@ public class DataManager {
         return data;
     }
 
-    public static void updatePlayerData(PlayerData playerData, Settings.SynchronisationCluster cluster) {
+    public static void updatePlayerData(PlayerData playerData, SynchronisationCluster cluster) {
         // Ignore if the Spigot server didn't properly sync the previous data
 
         // Add the new player data to the cache
@@ -179,7 +180,7 @@ public class DataManager {
         }
     }
 
-    private static void updatePlayerSQLData(PlayerData playerData, Settings.SynchronisationCluster cluster) {
+    private static void updatePlayerSQLData(PlayerData playerData, SynchronisationCluster cluster) {
         try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
             try (PreparedStatement statement = connection.prepareStatement(
                     "UPDATE " + cluster.dataTableName() + " SET `version_uuid`=?, `timestamp`=?, `inventory`=?, `ender_chest`=?, `health`=?, `max_health`=?, `health_scale`=?, `hunger`=?, `saturation`=?, `saturation_exhaustion`=?, `selected_slot`=?, `status_effects`=?, `total_experience`=?, `exp_level`=?, `exp_progress`=?, `game_mode`=?, `statistics`=?, `is_flying`=?, `advancements`=?, `location`=? WHERE `player_id`=(SELECT `id` FROM " + cluster.playerTableName() + " WHERE `uuid`=?);")) {
@@ -212,7 +213,7 @@ public class DataManager {
         }
     }
 
-    private static void insertPlayerData(PlayerData playerData, Settings.SynchronisationCluster cluster) {
+    private static void insertPlayerData(PlayerData playerData, SynchronisationCluster cluster) {
         try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
             try (PreparedStatement statement = connection.prepareStatement(
                     "INSERT INTO " + cluster.dataTableName() + " (`player_id`,`version_uuid`,`timestamp`,`inventory`,`ender_chest`,`health`,`max_health`,`health_scale`,`hunger`,`saturation`,`saturation_exhaustion`,`selected_slot`,`status_effects`,`total_experience`,`exp_level`,`exp_progress`,`game_mode`,`statistics`,`is_flying`,`advancements`,`location`) VALUES((SELECT `id` FROM " + cluster.playerTableName() + " WHERE `uuid`=?),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);")) {
@@ -251,7 +252,7 @@ public class DataManager {
      * @param playerUUID The UUID of the player
      * @return {@code true} if the player has an entry in the data table
      */
-    private static boolean playerHasCachedData(UUID playerUUID, Settings.SynchronisationCluster cluster) {
+    private static boolean playerHasCachedData(UUID playerUUID, SynchronisationCluster cluster) {
         try (Connection connection = HuskSyncBungeeCord.getConnection(cluster.clusterId())) {
             try (PreparedStatement statement = connection.prepareStatement(
                     "SELECT * FROM " + cluster.dataTableName() + " WHERE `player_id`=(SELECT `id` FROM " + cluster.playerTableName() + " WHERE `uuid`=?);")) {

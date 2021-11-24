@@ -26,7 +26,7 @@ subprojects {
     apply plugin: 'maven-publish'
 
     compileJava {
-        options.release = 16
+        //options.release = 8
     }
 
     repositories {

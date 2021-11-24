@@ -4,11 +4,9 @@ dependencies {
     implementation project(path: ':common', configuration: 'shadow')
 
     compileOnly 'redis.clients:jedis:3.7.0'
-    implementation 'org.bstats:bstats-bukkit:2.2.1'
     implementation 'de.themoep:minedown:1.7.1-SNAPSHOT'
 
-    compileOnly 'net.craftersland.data:bridge:3.36.3'
-    compileOnly 'org.spigotmc:spigot-api:1.16.5-R0.1-SNAPSHOT'
+    compileOnly 'org.spigotmc:spigot-api:1.8.8-R0.1-SNAPSHOT'
 }
 
 shadowJar {

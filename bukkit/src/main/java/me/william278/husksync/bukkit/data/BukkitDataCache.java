@@ -47,9 +47,9 @@ public class BukkitDataCache {
     /**
      * Map of data being viewed by players
      */
-    private static HashMap<UUID, DataViewer.DataView> viewingPlayerData;
+    private static HashMap<UUID, DataView> viewingPlayerData;
 
-    public void setViewing(UUID uuid, DataViewer.DataView dataView) {
+    public void setViewing(UUID uuid, DataView dataView) {
         viewingPlayerData.put(uuid, dataView);
     }
 
@@ -61,7 +61,7 @@ public class BukkitDataCache {
         return viewingPlayerData.containsKey(uuid);
     }
 
-    public DataViewer.DataView getViewing(UUID uuid) {
+    public DataView getViewing(UUID uuid) {
         return viewingPlayerData.get(uuid);
     }
 

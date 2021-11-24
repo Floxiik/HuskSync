@@ -2,8 +2,6 @@ package me.william278.husksync.bukkit.data;
 
 import me.william278.husksync.redis.RedisMessage;
 import org.bukkit.*;
-import org.bukkit.advancement.Advancement;
-import org.bukkit.advancement.AdvancementProgress;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -191,12 +189,12 @@ public class DataSerializer {
         return serializedPotionEffect != null ? new PotionEffect((Map<String, Object>) serializedPotionEffect) : null;
     }
 
-    public static DataSerializer.PlayerLocation deserializePlayerLocationData(String serializedLocationData) throws IOException {
+    public static PlayerLocation deserializePlayerLocationData(String serializedLocationData) throws IOException {
         if (serializedLocationData.isEmpty()) {
             return null;
         }
         try {
-            return (DataSerializer.PlayerLocation) RedisMessage.deserialize(serializedLocationData);
+            return (PlayerLocation) RedisMessage.deserialize(serializedLocationData);
         } catch (ClassNotFoundException e) {
             throw new IOException("Unable to decode class type.", e);
         }
@@ -204,50 +202,34 @@ public class DataSerializer {
 
     public static String getSerializedLocation(Player player) throws IOException {
         final Location playerLocation = player.getLocation();
-        return RedisMessage.serialize(new DataSerializer.PlayerLocation(playerLocation.getX(), playerLocation.getY(), playerLocation.getZ(),
+        return RedisMessage.serialize(new PlayerLocation(playerLocation.getX(), playerLocation.getY(), playerLocation.getZ(),
                 playerLocation.getYaw(), playerLocation.getPitch(), player.getWorld().getName(), player.getWorld().getEnvironment()));
     }
 
-    public record PlayerLocation(double x, double y, double z, float yaw, float pitch,
-                                 String worldName, World.Environment environment) implements Serializable {
-    }
-
     @SuppressWarnings("unchecked") // Ignore the unchecked cast here
-    public static ArrayList<DataSerializer.AdvancementRecord> deserializeAdvancementData(String serializedAdvancementData) throws IOException {
+    public static ArrayList<AdvancementRecord> deserializeAdvancementData(String serializedAdvancementData) throws IOException {
         if (serializedAdvancementData.isEmpty()) {
             return new ArrayList<>();
         }
         try {
-            return (ArrayList<DataSerializer.AdvancementRecord>) RedisMessage.deserialize(serializedAdvancementData);
+            return (ArrayList<AdvancementRecord>) RedisMessage.deserialize(serializedAdvancementData);
         } catch (ClassNotFoundException e) {
             throw new IOException("Unable to decode class type.", e);
         }
     }
 
     public static String getSerializedAdvancements(Player player) throws IOException {
-        Iterator<Advancement> serverAdvancements = Bukkit.getServer().advancementIterator();
-        ArrayList<DataSerializer.AdvancementRecord> advancementData = new ArrayList<>();
-
-        while (serverAdvancements.hasNext()) {
-            final AdvancementProgress progress = player.getAdvancementProgress(serverAdvancements.next());
-            final NamespacedKey advancementKey = progress.getAdvancement().getKey();
-            final ArrayList<String> awardedCriteria = new ArrayList<>(progress.getAwardedCriteria());
-            advancementData.add(new DataSerializer.AdvancementRecord(advancementKey.getNamespace() + ":" + advancementKey.getKey(), awardedCriteria));
-        }
+        ArrayList<AdvancementRecord> advancementData = new ArrayList<>();
 
         return RedisMessage.serialize(advancementData);
     }
 
-    public record AdvancementRecord(String advancementKey,
-                                    ArrayList<String> awardedAdvancementCriteria) implements Serializable {
-    }
-
-    public static DataSerializer.StatisticData deserializeStatisticData(String serializedStatisticData) throws IOException {
+    public static StatisticData deserializeStatisticData(String serializedStatisticData) throws IOException {
         if (serializedStatisticData.isEmpty()) {
-            return new DataSerializer.StatisticData(new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>());
+            return new StatisticData(new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>());
         }
         try {
-            return (DataSerializer.StatisticData) RedisMessage.deserialize(serializedStatisticData);
+            return (StatisticData) RedisMessage.deserialize(serializedStatisticData);
         } catch (ClassNotFoundException e) {
             throw new IOException("Unable to decode class type.", e);
         }
@@ -258,41 +240,9 @@ public class DataSerializer {
         HashMap<Statistic, HashMap<Material, Integer>> blockStatisticValues = new HashMap<>();
         HashMap<Statistic, HashMap<Material, Integer>> itemStatisticValues = new HashMap<>();
         HashMap<Statistic, HashMap<EntityType, Integer>> entityStatisticValues = new HashMap<>();
-        for (Statistic statistic : Statistic.values()) {
-            switch (statistic.getType()) {
-                case ITEM -> {
-                    HashMap<Material, Integer> itemValues = new HashMap<>();
-                    for (Material itemMaterial : Arrays.stream(Material.values()).filter(Material::isItem).collect(Collectors.toList())) {
-                        itemValues.put(itemMaterial, player.getStatistic(statistic, itemMaterial));
-                    }
-                    itemStatisticValues.put(statistic, itemValues);
-                }
-                case BLOCK -> {
-                    HashMap<Material, Integer> blockValues = new HashMap<>();
-                    for (Material blockMaterial : Arrays.stream(Material.values()).filter(Material::isBlock).collect(Collectors.toList())) {
-                        blockValues.put(blockMaterial, player.getStatistic(statistic, blockMaterial));
-                    }
-                    blockStatisticValues.put(statistic, blockValues);
-                }
-                case ENTITY -> {
-                    HashMap<EntityType, Integer> entityValues = new HashMap<>();
-                    for (EntityType type : Arrays.stream(EntityType.values()).filter(EntityType::isAlive).collect(Collectors.toList())) {
-                        entityValues.put(type, player.getStatistic(statistic, type));
-                    }
-                    entityStatisticValues.put(statistic, entityValues);
-                }
-                case UNTYPED -> untypedStatisticValues.put(statistic, player.getStatistic(statistic));
-            }
-        }
 
-        DataSerializer.StatisticData statisticData = new DataSerializer.StatisticData(untypedStatisticValues, blockStatisticValues, itemStatisticValues, entityStatisticValues);
+        StatisticData statisticData = new StatisticData(untypedStatisticValues, blockStatisticValues, itemStatisticValues, entityStatisticValues);
         return RedisMessage.serialize(statisticData);
-    }
-
-    public record StatisticData(HashMap<Statistic, Integer> untypedStatisticValues,
-                                HashMap<Statistic, HashMap<Material, Integer>> blockStatisticValues,
-                                HashMap<Statistic, HashMap<Material, Integer>> itemStatisticValues,
-                                HashMap<Statistic, HashMap<EntityType, Integer>> entityStatisticValues) implements Serializable {
     }
 
 }

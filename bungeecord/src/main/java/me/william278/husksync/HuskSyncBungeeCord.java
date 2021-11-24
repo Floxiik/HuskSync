@@ -1,5 +1,6 @@
 package me.william278.husksync;
 
+import me.william278.husksync.bungeecord.Server;
 import me.william278.husksync.bungeecord.command.HuskSyncCommand;
 import me.william278.husksync.bungeecord.config.ConfigLoader;
 import me.william278.husksync.bungeecord.config.ConfigManager;
@@ -9,12 +10,11 @@ import me.william278.husksync.bungeecord.data.sql.MySQL;
 import me.william278.husksync.bungeecord.data.sql.SQLite;
 import me.william278.husksync.bungeecord.listener.BungeeEventListener;
 import me.william278.husksync.bungeecord.listener.BungeeRedisListener;
-import me.william278.husksync.bungeecord.migrator.MPDBMigrator;
 import me.william278.husksync.bungeecord.util.BungeeUpdateChecker;
+import me.william278.husksync.redis.MessageTarget;
 import me.william278.husksync.redis.RedisMessage;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.plugin.Plugin;
-import org.bstats.bungeecord.Metrics;
 
 import java.io.IOException;
 import java.sql.Connection;
@@ -53,8 +53,6 @@ public final class HuskSyncBungeeCord extends Plugin {
         return clusterDatabases.get(clusterId).getConnection();
     }
 
-    public static MPDBMigrator mpdbMigrator;
-
     @Override
     public void onLoad() {
         instance = this;
@@ -84,10 +82,18 @@ public final class HuskSyncBungeeCord extends Plugin {
 
         // Initialize the database
         clusterDatabases = new HashMap<>();
-        for (Settings.SynchronisationCluster cluster : Settings.clusters) {
-            Database clusterDatabase = switch (Settings.dataStorageType) {
-                case SQLITE -> new SQLite(this, cluster);
-                case MYSQL -> new MySQL(this, cluster);
+        for (SynchronisationCluster cluster : Settings.clusters) {
+            Database clusterDatabase;
+            switch (Settings.dataStorageType) {
+                case SQLITE:
+                    clusterDatabase = new SQLite(this, cluster);
+                    break;
+                case MYSQL:
+                    clusterDatabase = new MySQL(this, cluster);
+                    break;
+                default:
+                    clusterDatabase = new SQLite(this, cluster);
+                    break;
             };
             clusterDatabase.load();
             clusterDatabase.createTables();
@@ -104,7 +110,7 @@ public final class HuskSyncBungeeCord extends Plugin {
 
 
         // Setup player data cache
-        for (Settings.SynchronisationCluster cluster : Settings.clusters) {
+        for (SynchronisationCluster cluster : Settings.clusters) {
             DataManager.playerDataCache.put(cluster, new DataManager.PlayerDataCache());
         }
 
@@ -119,16 +125,6 @@ public final class HuskSyncBungeeCord extends Plugin {
 
         // Register command
         getProxy().getPluginManager().registerCommand(this, new HuskSyncCommand());
-
-        // Prepare the migrator for use if needed
-        mpdbMigrator = new MPDBMigrator();
-
-        // Initialize bStats metrics
-        try {
-            new Metrics(this, METRICS_ID);
-        } catch (Exception e) {
-            getLogger().info("Skipped metrics initialization");
-        }
 
         // Log to console
         getLogger().info("Enabled HuskSync (" + getProxy().getName() + ") v" + getDescription().getVersion());
@@ -146,7 +142,7 @@ public final class HuskSyncBungeeCord extends Plugin {
         for (Server server : synchronisedServers) {
             try {
                 new RedisMessage(RedisMessage.MessageType.TERMINATE_HANDSHAKE,
-                        new RedisMessage.MessageTarget(Settings.ServerType.BUKKIT, null, server.clusterId()),
+                        new MessageTarget(Settings.ServerType.BUKKIT, null, server.clusterId()),
                         server.serverUUID().toString(),
                         ProxyServer.getInstance().getName()).send();
             } catch (IOException e) {
@@ -161,12 +157,5 @@ public final class HuskSyncBungeeCord extends Plugin {
 
         // Log to console
         getLogger().info("Disabled HuskSync (" + getProxy().getName() + ") v" + getDescription().getVersion());
-    }
-
-    /**
-     * A record representing a server synchronised on the network and whether it has MySqlPlayerDataBridge installed
-     */
-    public record Server(UUID serverUUID, boolean hasMySqlPlayerDataBridge, String huskSyncVersion, String serverBrand,
-                         String clusterId) {
     }
 }

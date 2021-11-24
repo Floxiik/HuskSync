@@ -10,7 +10,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
-import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.*;
@@ -103,12 +102,10 @@ public class EventListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
-    public void onPickupItem(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player player) {
-            if (!plugin.isEnabled() || !HuskSyncBukkit.handshakeCompleted || HuskSyncBukkit.bukkitCache.isAwaitingDataFetch(player.getUniqueId())) {
+    public void onPickupItem(PlayerPickupItemEvent event) {
+            if (!plugin.isEnabled() || !HuskSyncBukkit.handshakeCompleted || HuskSyncBukkit.bukkitCache.isAwaitingDataFetch(event.getPlayer().getUniqueId())) {
                 event.setCancelled(true); // If the plugin / player has not been set
             }
-        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

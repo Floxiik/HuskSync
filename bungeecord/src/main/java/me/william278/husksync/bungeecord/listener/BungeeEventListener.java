@@ -2,8 +2,10 @@ package me.william278.husksync.bungeecord.listener;
 
 import me.william278.husksync.HuskSyncBungeeCord;
 import me.william278.husksync.PlayerData;
+import me.william278.husksync.SynchronisationCluster;
 import me.william278.husksync.bungeecord.data.DataManager;
 import me.william278.husksync.Settings;
+import me.william278.husksync.redis.MessageTarget;
 import me.william278.husksync.redis.RedisMessage;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
@@ -27,18 +29,18 @@ public class BungeeEventListener implements Listener {
             DataManager.ensurePlayerExists(player.getUniqueId(), player.getName());
 
             // Get the player's data from SQL
-            final Map<Settings.SynchronisationCluster,PlayerData> data = DataManager.getPlayerData(player.getUniqueId());
+            final Map<SynchronisationCluster,PlayerData> data = DataManager.getPlayerData(player.getUniqueId());
 
             // Update the player's data from SQL onto the cache
             assert data != null;
-            for (Settings.SynchronisationCluster cluster : data.keySet()) {
+            for (SynchronisationCluster cluster : data.keySet()) {
                 DataManager.playerDataCache.get(cluster).updatePlayer(data.get(cluster));
             }
 
             // Send a message asking the bukkit to request data on join
             try {
                 new RedisMessage(RedisMessage.MessageType.REQUEST_DATA_ON_JOIN,
-                        new RedisMessage.MessageTarget(Settings.ServerType.BUKKIT, null, null),
+                        new MessageTarget(Settings.ServerType.BUKKIT, null, null),
                         RedisMessage.RequestOnJoinUpdateType.ADD_REQUESTER.toString(), player.getUniqueId().toString()).send();
             } catch (IOException e) {
                 plugin.getLogger().log(Level.SEVERE, "Failed to serialize request data on join message data");

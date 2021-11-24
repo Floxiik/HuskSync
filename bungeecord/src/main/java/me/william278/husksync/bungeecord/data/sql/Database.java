@@ -2,6 +2,7 @@ package me.william278.husksync.bungeecord.data.sql;
 
 import me.william278.husksync.HuskSyncBungeeCord;
 import me.william278.husksync.Settings;
+import me.william278.husksync.SynchronisationCluster;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -10,9 +11,9 @@ public abstract class Database {
     protected HuskSyncBungeeCord plugin;
 
     public String dataPoolName;
-    public Settings.SynchronisationCluster cluster;
+    public SynchronisationCluster cluster;
 
-    public Database(HuskSyncBungeeCord instance, Settings.SynchronisationCluster cluster) {
+    public Database(HuskSyncBungeeCord instance, SynchronisationCluster cluster) {
         this.plugin = instance;
         this.cluster = cluster;
         this.dataPoolName = "HuskSyncHikariPool-" + cluster.clusterId();

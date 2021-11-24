@@ -6,9 +6,8 @@ import me.william278.husksync.bukkit.config.ConfigLoader;
 import me.william278.husksync.bukkit.data.BukkitDataCache;
 import me.william278.husksync.bukkit.listener.BukkitRedisListener;
 import me.william278.husksync.bukkit.listener.EventListener;
-import me.william278.husksync.bukkit.migrator.MPDBDeserializer;
+import me.william278.husksync.redis.MessageTarget;
 import me.william278.husksync.redis.RedisMessage;
-import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -55,7 +54,7 @@ public final class HuskSyncBukkit extends JavaPlugin {
             }
             try {
                 new RedisMessage(RedisMessage.MessageType.CONNECTION_HANDSHAKE,
-                        new RedisMessage.MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
+                        new MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
                         serverUUID.toString(),
                         Boolean.toString(isMySqlPlayerDataBridgeInstalled),
                         Bukkit.getName(),
@@ -75,7 +74,7 @@ public final class HuskSyncBukkit extends JavaPlugin {
         if (!handshakeCompleted) return;
         try {
             new RedisMessage(RedisMessage.MessageType.TERMINATE_HANDSHAKE,
-                    new RedisMessage.MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
+                    new MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
                     serverUUID.toString(),
                     Bukkit.getName()).send();
         }  catch (IOException e) {
@@ -104,14 +103,6 @@ public final class HuskSyncBukkit extends JavaPlugin {
             new BukkitUpdateChecker().logToConsole();
         }
 
-        // Check if MySqlPlayerDataBridge is installed
-        Plugin mySqlPlayerDataBridge = Bukkit.getPluginManager().getPlugin("MySqlPlayerDataBridge");
-        if (mySqlPlayerDataBridge != null) {
-            isMySqlPlayerDataBridgeInstalled = mySqlPlayerDataBridge.isEnabled();
-            MPDBDeserializer.setMySqlPlayerDataBridge();
-            getLogger().info("MySQLPlayerDataBridge detected! Disabled data synchronisation to prevent data loss. To perform a migration, run \"husksync migrate\" in your Proxy (Bungeecord, Waterfall, etc) server console.");
-        }
-
         // Initialize last data update UUID cache
         bukkitCache = new BukkitDataCache();
 
@@ -127,13 +118,6 @@ public final class HuskSyncBukkit extends JavaPlugin {
 
         // Ensure redis is connected; establish a handshake
         establishRedisHandshake();
-
-        // Initialize bStats metrics
-        try {
-            new Metrics(this, METRICS_ID);
-        } catch (Exception e) {
-            getLogger().info("Skipped metrics initialization");
-        }
 
         // Log to console
         getLogger().info("Enabled HuskSync (" + getServer().getName() + ") v" + getDescription().getVersion());

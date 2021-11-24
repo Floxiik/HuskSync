@@ -5,12 +5,14 @@ import me.william278.husksync.PlayerData;
 import me.william278.husksync.Settings;
 import me.william278.husksync.api.events.SyncCompleteEvent;
 import me.william278.husksync.api.events.SyncEvent;
+import me.william278.husksync.bukkit.data.AdvancementRecord;
 import me.william278.husksync.bukkit.data.DataSerializer;
+import me.william278.husksync.bukkit.data.PlayerLocation;
+import me.william278.husksync.bukkit.data.StatisticData;
+import me.william278.husksync.redis.MessageTarget;
 import me.william278.husksync.redis.RedisMessage;
 import org.bukkit.*;
-import org.bukkit.advancement.Advancement;
-import org.bukkit.advancement.AdvancementProgress;
-import org.bukkit.attribute.Attribute;
+import org.bukkit.command.defaults.GameRuleCommand;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -66,15 +68,15 @@ public class PlayerSetter {
      * @return The {@link Player}'s max health
      */
     private static double getMaxHealth(Player player) {
-        double maxHealth = Objects.requireNonNull(player.getAttribute(Attribute.GENERIC_MAX_HEALTH)).getBaseValue();
+        double maxHealth = player.getMaxHealth();
 
         // If the player has additional health bonuses from synchronised potion effects, subtract these from this number as they are synchronised seperately
-        if (player.hasPotionEffect(PotionEffectType.HEALTH_BOOST) && maxHealth > 20D) {
-            PotionEffect healthBoostEffect = player.getPotionEffect(PotionEffectType.HEALTH_BOOST);
+        /*if (player.hasPotionEffect(PotionEffectType.HEALTH_BOOST) && maxHealth > 20D) {
+            PotionEffect healthBoostEffect = player.getPo(PotionEffectType.HEALTH_BOOST);
             assert healthBoostEffect != null;
             double healthBoostBonus = 4 * (healthBoostEffect.getAmplifier() + 1);
             maxHealth -= healthBoostBonus;
-        }
+        }*/
         return maxHealth;
     }
 
@@ -104,7 +106,7 @@ public class PlayerSetter {
         try {
             final String serializedPlayerData = getNewSerializedPlayerData(player);
             new RedisMessage(RedisMessage.MessageType.PLAYER_DATA_UPDATE,
-                    new RedisMessage.MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
+                    new MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
                     serializedPlayerData).send();
         } catch (IOException e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to send a PlayerData update to the proxy", e);
@@ -123,7 +125,7 @@ public class PlayerSetter {
      */
     public static void requestPlayerData(UUID playerUUID) throws IOException {
         new RedisMessage(RedisMessage.MessageType.PLAYER_DATA_REQUEST,
-                new RedisMessage.MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
+                new MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
                 playerUUID.toString()).send();
     }
 
@@ -259,72 +261,19 @@ public class PlayerSetter {
      * Update a player's advancements and progress to match the advancementData
      *
      * @param player          The player to set the advancements of
-     * @param advancementData The ArrayList of {@link DataSerializer.AdvancementRecord}s to set
+     * @param advancementData The ArrayList of {@link AdvancementRecord}s to set
      */
-    private static void setPlayerAdvancements(Player player, ArrayList<DataSerializer.AdvancementRecord> advancementData, PlayerData data) {
-        // Temporarily disable advancement announcing if needed
-        boolean announceAdvancementUpdate = false;
-        if (Boolean.TRUE.equals(player.getWorld().getGameRuleValue(GameRule.ANNOUNCE_ADVANCEMENTS))) {
-            player.getWorld().setGameRule(GameRule.ANNOUNCE_ADVANCEMENTS, false);
-            announceAdvancementUpdate = true;
-        }
-        final boolean finalAnnounceAdvancementUpdate = announceAdvancementUpdate;
+    private static void setPlayerAdvancements(Player player, ArrayList<AdvancementRecord> advancementData, PlayerData data) {
 
-        // Run async because advancement loading is very slow
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-
-            // Apply the advancements to the player
-            Iterator<Advancement> serverAdvancements = Bukkit.getServer().advancementIterator();
-            while (serverAdvancements.hasNext()) { // Iterate through all advancements
-                boolean correctExperienceCheck = false; // Determines whether the experience might have changed warranting an update
-                Advancement advancement = serverAdvancements.next();
-                AdvancementProgress playerProgress = player.getAdvancementProgress(advancement);
-                for (DataSerializer.AdvancementRecord record : advancementData) {
-                    // If the advancement is one on the data
-                    if (record.advancementKey().equals(advancement.getKey().getNamespace() + ":" + advancement.getKey().getKey())) {
-
-                        // Award all criteria that the player does not have that they do on the cache
-                        ArrayList<String> currentlyAwardedCriteria = new ArrayList<>(playerProgress.getAwardedCriteria());
-                        for (String awardCriteria : record.awardedAdvancementCriteria()) {
-                            if (!playerProgress.getAwardedCriteria().contains(awardCriteria)) {
-                                Bukkit.getScheduler().runTask(plugin, () -> player.getAdvancementProgress(advancement).awardCriteria(awardCriteria));
-                                correctExperienceCheck = true;
-                            }
-                            currentlyAwardedCriteria.remove(awardCriteria);
-                        }
-
-                        // Revoke all criteria that the player does have but should not
-                        for (String awardCriteria : currentlyAwardedCriteria) {
-                            Bukkit.getScheduler().runTask(plugin, () -> player.getAdvancementProgress(advancement).revokeCriteria(awardCriteria));
-                        }
-                        break;
-                    }
-                }
-
-                // Update the player's experience in case the advancement changed that
-                if (correctExperienceCheck) {
-                    if (Settings.syncExperience) {
-                        setPlayerExperience(player, data);
-                    }
-                }
-            }
-
-            // Re-enable announcing advancements (back on main thread again)
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (finalAnnounceAdvancementUpdate) {
-                    player.getWorld().setGameRule(GameRule.ANNOUNCE_ADVANCEMENTS, true);
-                }
-            });
-        });
     }
 
     /**
      * Set a player's statistics (in the Statistic menu)
      *
      * @param player        The player to set the statistics of
-     * @param statisticData The {@link DataSerializer.StatisticData} to set
+     * @param statisticData The {@link StatisticData} to set
      */
-    private static void setPlayerStatistics(Player player, DataSerializer.StatisticData statisticData) {
+    private static void setPlayerStatistics(Player player, StatisticData statisticData) {
         // Set untyped statistics
         for (Statistic statistic : statisticData.untypedStatisticValues().keySet()) {
             player.setStatistic(statistic, statisticData.untypedStatisticValues().get(statistic));
@@ -365,12 +314,12 @@ public class PlayerSetter {
     }
 
     /**
-     * Set a player's location from {@link DataSerializer.PlayerLocation} data
+     * Set a player's location from {@link PlayerLocation} data
      *
      * @param player   The {@link Player} to teleport
-     * @param location The {@link DataSerializer.PlayerLocation}
+     * @param location The {@link PlayerLocation}
      */
-    private static void setPlayerLocation(Player player, DataSerializer.PlayerLocation location) {
+    private static void setPlayerLocation(Player player, PlayerLocation location) {
         // Don't teleport if the location is invalid
         if (location == null) {
             return;
@@ -408,7 +357,7 @@ public class PlayerSetter {
     private static void setPlayerHealth(Player player, double health, double maxHealth, double healthScale) {
         // Set max health
         if (maxHealth != 0.0D) {
-            Objects.requireNonNull(player.getAttribute(Attribute.GENERIC_MAX_HEALTH)).setBaseValue(maxHealth);
+            player.setMaxHealth(maxHealth);
         }
 
         // Set health

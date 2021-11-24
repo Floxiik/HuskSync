@@ -3,6 +3,7 @@ package me.william278.husksync.bungeecord.data.sql;
 import com.zaxxer.hikari.HikariDataSource;
 import me.william278.husksync.HuskSyncBungeeCord;
 import me.william278.husksync.Settings;
+import me.william278.husksync.SynchronisationCluster;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -58,7 +59,7 @@ public class MySQL extends Database {
 
     private HikariDataSource dataSource;
 
-    public MySQL(HuskSyncBungeeCord instance, Settings.SynchronisationCluster cluster) {
+    public MySQL(HuskSyncBungeeCord instance, SynchronisationCluster cluster) {
         super(instance, cluster);
     }
 
@@ -81,7 +82,7 @@ public class MySQL extends Database {
         dataSource.setMaximumPoolSize(hikariMaximumPoolSize);
         dataSource.setMinimumIdle(hikariMinimumIdle);
         dataSource.setMaxLifetime(hikariMaximumLifetime);
-        dataSource.setKeepaliveTime(hikariKeepAliveTime);
+        //dataSource.setKeepaliveTime(hikariKeepAliveTime);
         dataSource.setConnectionTimeout(hikariConnectionTimeOut);
         dataSource.setPoolName(dataPoolName);
     }

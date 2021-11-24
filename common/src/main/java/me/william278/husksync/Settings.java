@@ -86,6 +86,6 @@ public class Settings {
     /**
      * Defines information for a synchronisation cluster as listed on the proxy
      */
-    public record SynchronisationCluster(String clusterId, String databaseName, String playerTableName, String dataTableName) {
-    }
+    /*public record SynchronisationCluster(String clusterId, String databaseName, String playerTableName, String dataTableName) {
+    }*/
 }

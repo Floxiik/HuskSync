@@ -2,13 +2,15 @@ package me.william278.husksync.bukkit.listener;
 
 import de.themoep.minedown.MineDown;
 import me.william278.husksync.HuskSyncBukkit;
+import me.william278.husksync.bukkit.data.DataView;
+import me.william278.husksync.bukkit.data.InventoryType;
+import me.william278.husksync.redis.MessageTarget;
 import me.william278.husksync.util.MessageManager;
 import me.william278.husksync.PlayerData;
 import me.william278.husksync.Settings;
 import me.william278.husksync.bukkit.config.ConfigLoader;
 import me.william278.husksync.bukkit.data.DataViewer;
 import me.william278.husksync.bukkit.util.PlayerSetter;
-import me.william278.husksync.bukkit.migrator.MPDBDeserializer;
 import me.william278.husksync.migrator.MPDBPlayerData;
 import me.william278.husksync.redis.RedisListener;
 import me.william278.husksync.redis.RedisMessage;
@@ -53,17 +55,24 @@ public class BukkitRedisListener extends RedisListener {
 
         // Handle the incoming redis message; either for a specific player or the system
         if (message.getMessageTarget().targetPlayerUUID() == null) {
+            UUID playerUUID;
+            UUID serverUUID;
+            String proxyBrand;
             switch (message.getMessageType()) {
-                case REQUEST_DATA_ON_JOIN -> {
-                    UUID playerUUID = UUID.fromString(message.getMessageDataElements()[1]);
+                case REQUEST_DATA_ON_JOIN:
+                    playerUUID = UUID.fromString(message.getMessageDataElements()[1]);
                     switch (me.william278.husksync.redis.RedisMessage.RequestOnJoinUpdateType.valueOf(message.getMessageDataElements()[0])) {
-                        case ADD_REQUESTER -> HuskSyncBukkit.bukkitCache.setRequestOnJoin(playerUUID);
-                        case REMOVE_REQUESTER -> HuskSyncBukkit.bukkitCache.removeRequestOnJoin(playerUUID);
+                        case ADD_REQUESTER:
+                            HuskSyncBukkit.bukkitCache.setRequestOnJoin(playerUUID);
+                            break;
+                        case REMOVE_REQUESTER:
+                            HuskSyncBukkit.bukkitCache.removeRequestOnJoin(playerUUID);
+                            break;
                     }
-                }
-                case CONNECTION_HANDSHAKE -> {
-                    UUID serverUUID = UUID.fromString(message.getMessageDataElements()[0]);
-                    String proxyBrand = message.getMessageDataElements()[1];
+                    break;
+                case CONNECTION_HANDSHAKE:
+                    serverUUID = UUID.fromString(message.getMessageDataElements()[0]);
+                    proxyBrand = message.getMessageDataElements()[1];
                     if (serverUUID.equals(HuskSyncBukkit.serverUUID)) {
                         HuskSyncBukkit.handshakeCompleted = true;
                         log(Level.INFO, "Completed handshake with " + proxyBrand + " proxy (" + serverUUID + ")");
@@ -77,10 +86,10 @@ public class BukkitRedisListener extends RedisListener {
                             }
                         }
                     }
-                }
-                case TERMINATE_HANDSHAKE -> {
-                    UUID serverUUID = UUID.fromString(message.getMessageDataElements()[0]);
-                    String proxyBrand = message.getMessageDataElements()[1];
+                    break;
+                case TERMINATE_HANDSHAKE:
+                    serverUUID = UUID.fromString(message.getMessageDataElements()[0]);
+                    proxyBrand = message.getMessageDataElements()[1];
                     if (serverUUID.equals(HuskSyncBukkit.serverUUID)) {
                         HuskSyncBukkit.handshakeCompleted = false;
                         log(Level.WARNING, proxyBrand + " proxy has terminated communications; attempting to re-establish (" + serverUUID + ")");
@@ -88,35 +97,17 @@ public class BukkitRedisListener extends RedisListener {
                         // Attempt to re-establish communications via another handshake
                         Bukkit.getScheduler().runTaskLaterAsynchronously(plugin, HuskSyncBukkit::establishRedisHandshake, 20);
                     }
-                }
-                case DECODE_MPDB_DATA -> {
-                    UUID serverUUID = UUID.fromString(message.getMessageDataElements()[0]);
-                    String encodedData = message.getMessageDataElements()[1];
-                    Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
-                        if (serverUUID.equals(HuskSyncBukkit.serverUUID)) {
-                            try {
-                                MPDBPlayerData data = (MPDBPlayerData) RedisMessage.deserialize(encodedData);
-                                new RedisMessage(RedisMessage.MessageType.DECODED_MPDB_DATA_SET,
-                                        new RedisMessage.MessageTarget(Settings.ServerType.BUNGEECORD, null, Settings.cluster),
-                                        RedisMessage.serialize(MPDBDeserializer.convertMPDBData(data)),
-                                        data.playerName)
-                                        .send();
-                            } catch (IOException | ClassNotFoundException e) {
-                                log(Level.SEVERE, "Failed to serialize encoded MPDB data");
-                            }
-                        }
-                    });
-                }
-                case RELOAD_CONFIG -> {
+                    break;
+                case RELOAD_CONFIG:
                     plugin.reloadConfig();
                     ConfigLoader.loadSettings(plugin.getConfig());
-                }
+                    break;
             }
         } else {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (player.getUniqueId().equals(message.getMessageTarget().targetPlayerUUID())) {
                     switch (message.getMessageType()) {
-                        case PLAYER_DATA_SET -> {
+                        case PLAYER_DATA_SET:
                             if (HuskSyncBukkit.isMySqlPlayerDataBridgeInstalled) return;
                             try {
                                 // Deserialize the received PlayerData
@@ -128,8 +119,8 @@ public class BukkitRedisListener extends RedisListener {
                                 log(Level.SEVERE, "Failed to deserialize PlayerData when handling data from the proxy");
                                 e.printStackTrace();
                             }
-                        }
-                        case SEND_PLUGIN_INFORMATION -> {
+                            break;
+                        case SEND_PLUGIN_INFORMATION:
                             String proxyBrand = message.getMessageDataElements()[0];
                             String proxyVersion = message.getMessageDataElements()[1];
                             assert plugin.getDescription().getDescription() != null;
@@ -140,8 +131,8 @@ public class BukkitRedisListener extends RedisListener {
                                     .replaceAll("%bukkit_brand%", Bukkit.getName())
                                     .replaceAll("%bukkit_version%", plugin.getDescription().getVersion()))
                                     .toComponent());
-                        }
-                        case OPEN_INVENTORY -> {
+                            break;
+                        case OPEN_INVENTORY:
                             // Get the name of the inventory owner
                             String inventoryOwnerName = message.getMessageDataElements()[0];
 
@@ -152,14 +143,14 @@ public class BukkitRedisListener extends RedisListener {
                                     PlayerData data = (PlayerData) RedisMessage.deserialize(message.getMessageDataElements()[1]);
 
                                     // Show the data to the player
-                                    DataViewer.showData(player, new DataViewer.DataView(data, inventoryOwnerName, DataViewer.DataView.InventoryType.INVENTORY));
+                                    DataViewer.showData(player, new DataView(data, inventoryOwnerName, InventoryType.INVENTORY));
                                 } catch (IOException | ClassNotFoundException e) {
                                     log(Level.SEVERE, "Failed to deserialize PlayerData when handling inventory-see data from the proxy");
                                     e.printStackTrace();
                                 }
                             });
-                        }
-                        case OPEN_ENDER_CHEST -> {
+                            break;
+                        case OPEN_ENDER_CHEST:
                             // Get the name of the inventory owner
                             String enderChestOwnerName = message.getMessageDataElements()[0];
 
@@ -170,13 +161,13 @@ public class BukkitRedisListener extends RedisListener {
                                     PlayerData data = (PlayerData) RedisMessage.deserialize(message.getMessageDataElements()[1]);
 
                                     // Show the data to the player
-                                    DataViewer.showData(player, new DataViewer.DataView(data, enderChestOwnerName, DataViewer.DataView.InventoryType.ENDER_CHEST));
+                                    DataViewer.showData(player, new DataView(data, enderChestOwnerName, InventoryType.ENDER_CHEST));
                                 } catch (IOException | ClassNotFoundException e) {
                                     log(Level.SEVERE, "Failed to deserialize PlayerData when handling ender chest-see data from the proxy");
                                     e.printStackTrace();
                                 }
                             });
-                        }
+                            break;
                     }
                     return;
                 }

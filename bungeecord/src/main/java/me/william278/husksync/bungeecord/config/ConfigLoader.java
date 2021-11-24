@@ -1,5 +1,6 @@
 package me.william278.husksync.bungeecord.config;
 
+import me.william278.husksync.SynchronisationCluster;
 import me.william278.husksync.util.MessageManager;
 import me.william278.husksync.Settings;
 import net.md_5.bungee.config.Configuration;
@@ -39,7 +40,7 @@ public class ConfigLoader {
             final String playerTableName = config.getString("clusters." + clusterId + ".player_table", "husksync_players");
             final String dataTableName = config.getString("clusters." + clusterId + ".data_table", "husksync_data");
             final String databaseName = config.getString("clusters." + clusterId + ".database", Settings.mySQLDatabase);
-            Settings.clusters.add(new Settings.SynchronisationCluster(clusterId, databaseName, playerTableName, dataTableName));
+            Settings.clusters.add(new SynchronisationCluster(clusterId, databaseName, playerTableName, dataTableName));
         }
     }
 
